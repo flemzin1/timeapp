@@ -1,14 +1,18 @@
 "use client"
 
 import type React from "react"
-import "./ActionButton.css"
+import "./ActionButton.css";
+import {
+  ConnectButton,
+  addressEllipsis,
+} from "@suiet/wallet-kit";
+
 
 interface CallToActionProps {
-  onWalletConnect: () => void
   isWalletConnected: boolean
 }
 
-const CallToAction: React.FC<CallToActionProps> = ({ onWalletConnect, isWalletConnected }) => {
+const CallToAction: React.FC<CallToActionProps> = ({  isWalletConnected }) => {
   return (
     <section className="cta">
       <div className="container">
@@ -20,9 +24,7 @@ const CallToAction: React.FC<CallToActionProps> = ({ onWalletConnect, isWalletCo
           </p>
 
           {!isWalletConnected ? (
-            <button className="cta-button" onClick={onWalletConnect}>
-              Connect Wallet
-            </button>
+            <ConnectButton>Connect Wallet</ConnectButton>
           ) : (
             <a href="/dashboard" className="cta-button">
              Get Started

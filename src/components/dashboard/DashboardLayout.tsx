@@ -10,7 +10,7 @@ interface DashboardLayoutProps {
   walletAddress: string
   isDarkMode: boolean
   onToggleTheme: () => void
-  onLogout: () => void
+  // onLogout: () => void
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({
@@ -18,7 +18,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   walletAddress,
   isDarkMode,
   onToggleTheme,
-  onLogout,
+  
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false)
@@ -35,7 +35,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     <div className={`dashboard-layout ${isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
-        onLogout={onLogout} 
+        // onLogout={onLogout} 
         mobileOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
       />

@@ -3,25 +3,27 @@
 import type React from "react"
 import { useState } from "react"
 import "./NavBar.css"
+import {
+  ConnectButton,
+} from "@suiet/wallet-kit";
+
+import '@suiet/wallet-kit/style.css'
 
 interface NavbarProps {
   isWalletConnected: boolean
-  walletAddress: string
-  onWalletConnect: () => void
-  onWalletDisconnect: () => void
 }
 
-const Navbar: React.FC<NavbarProps> = ({ isWalletConnected, walletAddress, onWalletConnect, onWalletDisconnect }) => {
+const Navbar: React.FC<NavbarProps> = ({ isWalletConnected}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false)
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
   }
 
-  const shortenAddress = (address: string) => {
-    if (!address) return "";
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
-  }
+  // const shortenAddress = (address: string) => {
+  //   if (!address) return "";
+  //   return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  // }
 
   return (
     <nav className="navbar">
@@ -34,23 +36,18 @@ const Navbar: React.FC<NavbarProps> = ({ isWalletConnected, walletAddress, onWal
         <div className={`navbar-menu ${isMobileMenuOpen ? "active" : ""}`}>
          
 
-          {isWalletConnected ? (
             <div className="wallet-connected">
-              <a href="/dashboard" className="navbar-link dashboard-link">
+              {isWalletConnected&& (<a href="/dashboard" className="navbar-link dashboard-link">
                 Dashboard
-              </a>
-              <div className="wallet-info">
-                <span className="wallet-address">{shortenAddress(walletAddress)}</span>
-                <button className="disconnect-btn" onClick={onWalletDisconnect}>
-                  Disconnect
-                </button>
-              </div>
+              </a>)}
+              
+              <ConnectButton>Connect Wallet</ConnectButton>
+
             </div>
-          ) : (
-            <button className="connect-wallet-btn" onClick={onWalletConnect}>
-              Connect Wallet
-            </button>
-          )}
+
+       
+              
+          
         </div>
 
         <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>

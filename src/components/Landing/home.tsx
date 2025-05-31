@@ -1,12 +1,13 @@
 
 import type React from "react"
 import "./home.css"
+import { ConnectButton } from "@suiet/wallet-kit"
 interface HeroProps {
-  onWalletConnect: () => void
+
   isWalletConnected: boolean
 }
 
-const Hero: React.FC<HeroProps> = ({ onWalletConnect, isWalletConnected }) => {
+const Hero: React.FC<HeroProps> = ({ isWalletConnected }) => {
   return (
     <section className="hero">
       <div className="hero-container">
@@ -26,9 +27,9 @@ const Hero: React.FC<HeroProps> = ({ onWalletConnect, isWalletConnected }) => {
           </p>
 
           {!isWalletConnected ? (
-            <button className="hero-cta-btn" onClick={onWalletConnect}>
+            <ConnectButton className="hero-cta-btn">
               Connect Wallet
-            </button>
+            </ConnectButton>
           ) : (
             <a href="/dashboard" className="hero-cta-btn">
               Get Started

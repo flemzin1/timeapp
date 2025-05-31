@@ -1,6 +1,10 @@
 import type React from "react"
 import "./Topbar.css"
 import { Moon, SunMoon, User } from 'lucide-react';
+import {
+  useWallet
+} from "@suiet/wallet-kit";
+
 interface TopbarProps {
   walletAddress: string
   isDarkMode: boolean
@@ -28,6 +32,7 @@ const Topbar: React.FC<TopbarProps> = ({
     // You could add a toast notification here
   }
 
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -43,9 +48,10 @@ const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       <div className="topbar-right">
-        <button className="theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+        {/* <button className="theme-toggle" onClick={onToggleTheme} title="Toggle theme">
           {isDarkMode ?  <SunMoon /> :   <Moon />}
-        </button>
+        </button> */}
+        {/* <ConnectButton>Connect Wallet</ConnectButton> */}
 
         <div className="wallet-info" onClick={copyToClipboard} title="Click to copy full address">
         

@@ -1,17 +1,23 @@
 import type React from "react"
-import { NavLink} from "react-router-dom" 
+import { Navigate, NavLink} from "react-router-dom" 
 import "./Sidebar.css"
-import { House, FolderOpenDot, CheckCheck, Plus, ChartColumnIncreasing, Bell, Settings, LogOut, X } from 'lucide-react';
+import { House, FolderOpenDot, CheckCheck, Plus, ChartColumnIncreasing, Bell, Settings, LogOut, X, Wallet } from 'lucide-react';
+import { useWallet } from "@suiet/wallet-kit";
+import '@suiet/wallet-kit/style.css'
+
+
 
 interface SidebarProps {
   isCollapsed: boolean
-  onLogout: () => void
+  // onLogout: () => void
   mobileOpen?: boolean
   onClose?: () => void
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onLogout, mobileOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, mobileOpen, onClose }) => {
  // const location = useLocation()
+
+  const Wallet = useWallet()
 
   const menuItems = [
     { path: "/dashboard", icon: <House />, label: "Home" },
@@ -57,7 +63,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onLogout, mobileOpen, on
       </nav>
 
       <div className="sidebar-footer">
-        <button className="logout-btn" onClick={onLogout} title={isCollapsed ? "Logout" : ""}>
+
+          <button className="logout-btn" onClick={()=>{
+            Wallet.disconnect();
+            Navigate({to:'/home'});
+          }} title={isCollapsed ? "Logout" : ""}>
           <span className="nav-icon"><LogOut /></span>
           {!isCollapsed && <span className="nav-label">Logout</span>}
         </button>

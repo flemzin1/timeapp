@@ -19,28 +19,33 @@ import ProjectTracker from "./components/dashboard/ProjectTracker"
 import TodoList from "./components/dashboard/TodoList"
 import Notifications from "./components/dashboard/Notification"
 import Analytics from "./components/dashboard/Analytic"
-import Settings from "./components/dashboard/Setting"
+import Settings from "./components/dashboard/Setting";
+import { useWallet } from "@suiet/wallet-kit";
 
 // Landing Page Component
 const LandingPage: React.FC<{
   isWalletConnected: boolean;
-  walletAddress: string;
-  onWalletConnect: () => void;
-  onWalletDisconnect: () => void;
-}> = ({ isWalletConnected, walletAddress, onWalletConnect, onWalletDisconnect }) => {
+  // onWalletConnect: () => void;
+  // onWalletDisconnect: () => void;
+}> = ({   }) => {
+
+    const wallet = useWallet();
+    const walletAddress = wallet.address || "";
+    const isWalletConnected = wallet.connected || false;
+
   return (
     <>
       <Navbar
-        isWalletConnected={isWalletConnected}
-        walletAddress={walletAddress}
-        onWalletConnect={onWalletConnect}
-        onWalletDisconnect={onWalletDisconnect}
+        isWalletConnected={wallet?.connected}
+        // walletAddress={walletAddress}
+        // onWalletConnect={onWalletConnect}
+        // onWalletDisconnect={onWalletDisconnect}
       />
       <main className="main-content">
-        <Hero onWalletConnect={onWalletConnect} isWalletConnected={isWalletConnected} />
+        <Hero isWalletConnected={isWalletConnected} />
         <HowItWorks />
         <Features />
-        <CallToAction onWalletConnect={onWalletConnect} isWalletConnected={isWalletConnected} />
+        <CallToAction  isWalletConnected={isWalletConnected} />
       </main>
       <Footer />
     </>
@@ -48,14 +53,16 @@ const LandingPage: React.FC<{
 };
 
 const App: React.FC = () => {
-  const [isWalletConnected, setIsWalletConnected] = useState<boolean>(() => {
-    const saved = localStorage.getItem('isWalletConnected');
-    return saved ? JSON.parse(saved) : false;
-  });
+  // const [isWalletConnected, setIsWalletConnected] = useState<boolean>(() => {
+  //   const saved = localStorage.getItem('isWalletConnected');
+  //   return saved ? JSON.parse(saved) : false;
+  // });
   
-  const [walletAddress, setWalletAddress] = useState<string>(() => {
-    return localStorage.getItem('walletAddress') || "";
-  });
+
+    const wallet = useWallet();
+    const walletAddress = wallet.address || "";
+    const isWalletConnected = wallet.connected || false;
+
   
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('isDarkMode');
@@ -63,30 +70,30 @@ const App: React.FC = () => {
   });
 
   // Save states to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('isWalletConnected', JSON.stringify(isWalletConnected));
-  }, [isWalletConnected]);
+  // useEffect(() => {
+  //   localStorage.setItem('isWalletConnected', JSON.stringify(isWalletConnected));
+  // }, [isWalletConnected]);
 
-  useEffect(() => {
-    localStorage.setItem('walletAddress', walletAddress);
-  }, [walletAddress]);
+  // useEffect(() => {
+  //   localStorage.setItem('walletAddress', walletAddress);
+  // }, [walletAddress]);
 
   useEffect(() => {
     localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
-  const handleWalletConnect = () => {
-    // Simulate wallet connection
-    setIsWalletConnected(true)
-    setWalletAddress("0x1234567890abcdef1234567890abcdef12345678")
-  }
+  // const handleWalletConnect = () => {
+  //   // Simulate wallet connection
+  //   setIsWalletConnected(true)
+  //   setWalletAddress("0x1234567890abcdef1234567890abcdef12345678")
+  // }
 
-  const handleWalletDisconnect = () => {
-    setIsWalletConnected(false)
-    setWalletAddress("")
-    localStorage.removeItem('isWalletConnected');
-    localStorage.removeItem('walletAddress');
-  }
+  // const handleWalletDisconnect = () => {
+  //   setIsWalletConnected(false)
+  //   setWalletAddress("")
+  //   localStorage.removeItem('isWalletConnected');
+  //   localStorage.removeItem('walletAddress');
+  // }
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode)
@@ -103,9 +110,6 @@ const App: React.FC = () => {
               !isWalletConnected ? (
                 <LandingPage
                   isWalletConnected={isWalletConnected}
-                  walletAddress={walletAddress}
-                  onWalletConnect={handleWalletConnect}
-                  onWalletDisconnect={handleWalletDisconnect}
                 />
               ) : (
                 <Navigate to="/dashboard" replace />
@@ -119,9 +123,7 @@ const App: React.FC = () => {
             element={
               <LandingPage
                 isWalletConnected={isWalletConnected}
-                walletAddress={walletAddress}
-                onWalletConnect={handleWalletConnect}
-                onWalletDisconnect={handleWalletDisconnect}
+
               />
             }
           />
@@ -135,7 +137,7 @@ const App: React.FC = () => {
                   walletAddress={walletAddress}
                   isDarkMode={isDarkMode}
                   onToggleTheme={toggleTheme}
-                  onLogout={handleWalletDisconnect}
+                  
                 >
                   <Routes>
                     <Route index element={<DashboardHome />} />

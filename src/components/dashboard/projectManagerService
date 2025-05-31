@@ -1,0 +1,440 @@
+// projectManagerService.ts
+// import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { Transaction } from "@mysten/sui";
+import { SuiClient } from '@mysten/sui.js/client';
+import { WalletContextState, useWallet } from '@suiet/wallet-kit';
+import type { CriticalPathResult, CPATask } from './criticalPathAnalysis';
+
+const wallet = useWallet();
+
+// Smart Contract Configuration
+const PACKAGE_ID = '0xab4d47aabac347c67d3fb6574c36f27b1587672820e86a00f8118d0f937c57f7';
+const MODULE_NAME = 'project_manager';
+
+// Type definitions for smart contract interaction
+export interface TeamMember {
+  id: string;
+  walletAddress: string;
+  role: string;
+}
+
+export interface ProjectTask {
+  id: string;
+  name: string;
+  assignedTo: string;
+  dependencies: string[];
+  estimatedDuration: number;
+}
+
+export interface DeploymentResult {
+  success: boolean;
+  projectHolderId?: string;
+  transactionHash?: string;
+  error?: string;
+}
+
+export interface TaskAssignment {
+  participantId: string;
+  taskId: string;
+  role: string;
+}
+
+export class ProjectManagerService {
+  private client: SuiClient;
+  private wallet: WalletContextState;
+
+  constructor(client: SuiClient, wallet: WalletContextState) {
+    this.client = client;
+    this.wallet = wallet;
+  }
+
+  /**
+   * Deploy a complete project to the Sui blockchain
+   */
+  async deployProject(
+    projectName: string,
+    description: string,
+    startDate: string,
+    teamMembers: TeamMember[],
+    tasks: ProjectTask[],
+    criticalPathResult: CriticalPathResult
+  ): Promise<DeploymentResult> {
+    try {
+      if (!this.wallet.connected || !this.wallet.account?.address) {
+        throw new Error('Wallet not connected');
+      }
+
+      // Step 1: Create the project
+      const projectHolderId = await this.createProject(projectName);
+      
+      // Step 2: Add participants
+      await this.addParticipants(projectHolderId, teamMembers);
+      
+      // Step 3: Add tasks with critical path data
+      const taskIdMap = await this.addTasksWithCriticalPath(
+        projectHolderId, 
+        tasks, 
+        criticalPathResult,
+        startDate
+      );
+      
+      // Step 4: Assign tasks to participants
+      await this.assignTasksToParticipants(projectHolderId, tasks, teamMembers, taskIdMap);
+
+      return {
+        success: true,
+        projectHolderId,
+        transactionHash: projectHolderId // Using project holder ID as reference
+      };
+
+    } catch (error) {
+      console.error('Project deployment failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown deployment error'
+      };
+    }
+  }
+
+  /**
+   * Create a new project on the blockchain
+   */
+  private async createProject(projectName: string): Promise<string> {
+    const tx = new TransactionBlock();
+    
+    tx.moveCall({
+      target: `${PACKAGE_ID}::${MODULE_NAME}::create_project`,
+      arguments: [
+        tx.pure.string(projectName)
+      ]
+    });
+
+    // const result = await this.wallet.signAndExecuteTransactionBlock({
+    //   transactionBlock: tx,
+    //   options: {
+    //     showEffects: true,
+    //     showObjectChanges: true,
+    //   }
+    // });
+
+
+//     const result = await this.wallet.signAndExecuteTransactionBlock({
+//   transactionBlock: tx, // No type assertion needed
+//   options: {
+//     showEffects: true,
+//     showObjectChanges: true,
+//   },
+// });
+
+const res = await wallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+      });
+
+
+    // Extract the project holder ID from the transaction result
+    const createdObjects = result.objectChanges?.filter(
+      (change) => change.type === 'created'
+    );
+
+    if (!createdObjects || createdObjects.length === 0) {
+      throw new Error('Failed to create project - no objects created');
+    }
+
+    // Find the Project_holder object
+    const projectHolder = createdObjects.find(obj => 
+      obj.type === 'created' && 
+      obj.objectType?.includes('Project_holder')
+    );
+
+    if (!projectHolder || projectHolder.type !== 'created') {
+      throw new Error('Failed to find created Project_holder object');
+    }
+
+    return projectHolder.objectId;
+  }
+
+  /**
+   * Add participants to the project
+   */
+  private async addParticipants(
+    projectHolderId: string, 
+    teamMembers: TeamMember[]
+  ): Promise<void> {
+    if (teamMembers.length === 0) return;
+
+    const tx = new TransactionBlock();
+    
+    const participantIds = teamMembers.map(member => member.id);
+    const participantNames = teamMembers.map(member => member.role); // Using role as name for now
+    const participantEmails = teamMembers.map(member => member.walletAddress); // Using wallet address as email identifier
+
+    tx.moveCall({
+      target: `${PACKAGE_ID}::${MODULE_NAME}::add_participants`,
+      arguments: [
+        tx.object(projectHolderId),
+        tx.pure.vector('string', participantIds),
+        tx.pure.vector('string', participantNames),
+        tx.pure.vector('string', participantEmails)
+      ]
+    });
+
+    const result = await this.wallet.signAndExecuteTransactionBlock({
+      transactionBlock: tx,
+      options: {
+        showEffects: true,
+      }
+    });
+
+    if (result.effects?.status?.status !== 'success') {
+      throw new Error('Failed to add participants to project');
+    }
+  }
+
+  /**
+   * Add tasks with critical path analysis data
+   */
+  private async addTasksWithCriticalPath(
+    projectHolderId: string,
+    tasks: ProjectTask[],
+    criticalPathResult: CriticalPathResult,
+    startDate: string
+  ): Promise<Map<string, string>> {
+    const taskIdMap = new Map<string, string>(); // frontend task ID -> blockchain task ID
+    const baseDate = new Date(startDate);
+
+    for (const task of tasks) {
+      // Find corresponding CPA task
+      const cpaTask = criticalPathResult.tasks.find(t => t.id === task.id);
+      if (!cpaTask) {
+        throw new Error(`Critical path data not found for task: ${task.name}`);
+      }
+
+      // Calculate timestamps
+      const startTime = Math.floor(baseDate.getTime() / 1000) + (cpaTask.earliestStart * 24 * 60 * 60);
+      const endTime = Math.floor(baseDate.getTime() / 1000) + (cpaTask.earliestFinish * 24 * 60 * 60);
+
+      // Convert dependency IDs (will be mapped after all tasks are created)
+      const dependencies: string[] = []; // Will be populated in a second pass
+
+      const blockchainTaskId = await this.addSingleTask(
+        projectHolderId,
+        task.name,
+        task.estimatedDuration,
+        dependencies, // Empty for now, will update in second pass
+        startTime,
+        endTime,
+        cpaTask.isCritical,
+        'assigned_role' // Default role, will be updated during assignment
+      );
+
+      taskIdMap.set(task.id, blockchainTaskId);
+    }
+
+    // Second pass: Update task dependencies
+    // Note: This would require a separate contract function to update dependencies
+    // For now, we'll handle dependencies during initial creation in a more complex way
+
+    return taskIdMap;
+  }
+
+  /**
+   * Add a single task to the project
+   */
+  private async addSingleTask(
+    projectHolderId: string,
+    name: string,
+    duration: number,
+    dependencies: string[],
+    startTime: number,
+    endTime: number,
+    isCritical: boolean,
+    role: string
+  ): Promise<string> {
+    const tx = new TransactionBlock();
+
+    // Create new UIDs for dependencies (simplified - in real implementation, 
+    // you'd need to handle the dependency mapping more carefully)
+    const dependencyIds = dependencies.map(() => tx.object('0x0')); // Placeholder
+
+    tx.moveCall({
+      target: `${PACKAGE_ID}::${MODULE_NAME}::add_task`,
+      arguments: [
+        tx.object(projectHolderId),
+        tx.pure.string(name),
+        tx.pure.u64(duration),
+        tx.pure.vector('address', dependencyIds), // Note: This needs to be properly handled
+        tx.pure.u64(startTime),
+        tx.pure.u64(endTime),
+        tx.pure.bool(isCritical),
+        tx.pure.string(role)
+      ]
+    });
+
+    const result = await this.wallet.signAndExecuteTransactionBlock({
+      transactionBlock: tx,
+      options: {
+        showEffects: true,
+        showObjectChanges: true,
+      }
+    });
+
+    if (result.effects?.status?.status !== 'success') {
+      throw new Error(`Failed to add task: ${name}`);
+    }
+
+    // Extract task ID from transaction effects
+    // This is a simplified approach - in practice, you'd need to parse the transaction results
+    return `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Assign tasks to participants
+   */
+  private async assignTasksToParticipants(
+    projectHolderId: string,
+    tasks: ProjectTask[],
+    teamMembers: TeamMember[],
+    taskIdMap: Map<string, string>
+  ): Promise<void> {
+    const participantIds: string[] = [];
+    const taskIds: string[] = [];
+    const roles: string[] = [];
+
+    // Build assignment arrays
+    for (const task of tasks) {
+      const assignedMember = teamMembers.find(member => member.walletAddress === task.assignedTo);
+      if (assignedMember) {
+        const blockchainTaskId = taskIdMap.get(task.id);
+        if (blockchainTaskId) {
+          participantIds.push(assignedMember.id);
+          taskIds.push(blockchainTaskId);
+          roles.push(assignedMember.role);
+        }
+      }
+    }
+
+    if (participantIds.length === 0) return;
+
+    const tx = new TransactionBlock();
+
+    // Convert task IDs to proper format for the contract
+    const taskIdObjects = taskIds.map(id => tx.object(id));
+
+    tx.moveCall({
+      target: `${PACKAGE_ID}::${MODULE_NAME}::assign_tasks_to_participants`,
+      arguments: [
+        tx.object(projectHolderId),
+        tx.pure.vector('string', participantIds),
+        tx.pure.vector('address', taskIdObjects), // Note: Type conversion needed
+        tx.pure.vector('string', roles)
+      ]
+    });
+
+    const result = await this.wallet.signAndExecuteTransactionBlock({
+      transactionBlock: tx,
+      options: {
+        showEffects: true,
+      }
+    });
+
+    if (result.effects?.status?.status !== 'success') {
+      throw new Error('Failed to assign tasks to participants');
+    }
+  }
+
+  /**
+   * Complete a task on the blockchain
+   */
+  async completeTask(projectHolderId: string, taskId: string): Promise<boolean> {
+    try {
+      const tx = new TransactionBlock();
+
+      tx.moveCall({
+        target: `${PACKAGE_ID}::${MODULE_NAME}::complete_task`,
+        arguments: [
+          tx.object(projectHolderId),
+          tx.object(taskId)
+        ]
+      });
+
+      const result = await this.wallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: {
+          showEffects: true,
+        }
+      });
+
+      return result.effects?.status?.status === 'success';
+    } catch (error) {
+      console.error('Failed to complete task:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get project information from the blockchain
+   */
+  async getProject(projectHolderId: string): Promise<any> {
+    try {
+      const tx = new TransactionBlock();
+
+      tx.moveCall({
+        target: `${PACKAGE_ID}::${MODULE_NAME}::get_project`,
+        arguments: [tx.object(projectHolderId)]
+      });
+
+      // Note: For view functions, you might need to use a different approach
+      // This is a simplified implementation
+      const result = await this.client.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: this.wallet.account?.address || '0x0'
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Failed to get project:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if project is on schedule
+   */
+  async isProjectOnSchedule(projectHolderId: string): Promise<boolean> {
+    try {
+      const tx = new TransactionBlock();
+      const now = Math.floor(Date.now() / 1000);
+
+      tx.moveCall({
+        target: `${PACKAGE_ID}::${MODULE_NAME}::is_project_on_schedule`,
+        arguments: [
+          tx.object(projectHolderId),
+          tx.pure.u64(now)
+        ]
+      });
+
+      const result = await this.client.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: this.wallet.account?.address || '0x0'
+      });
+
+      // Parse result to get boolean value
+      // This is a simplified implementation
+      return true; // Placeholder
+    } catch (error) {
+      console.error('Failed to check project schedule:', error);
+      return false;
+    }
+  }
+}
+
+// Utility functions
+export const createProjectManagerService = (
+  client: SuiClient, 
+  wallet: WalletContextState
+): ProjectManagerService => {
+  return new ProjectManagerService(client, wallet);
+};
+
+// Export types for use in components
+export type { DeploymentResult, TaskAssignment };
