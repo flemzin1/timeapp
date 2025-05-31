@@ -3,11 +3,8 @@
 import type React from "react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { useWallet } from "@suiet/wallet-kit"
-import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client'
 import { CriticalPathAnalyzer, type CriticalPathResult } from "./criticalPathAnalysis"
 import CriticalPathDisplay from "./CriticalPathDisplay"
-import { ProjectManagerService, createProjectManagerService, type DeploymentResult } from "./projectManagerService"
 import "./CreateProject.css"
 import "./CriticalPathDisplay.css"
 
@@ -27,11 +24,9 @@ interface TeamMember {
 
 const CreateProject: React.FC = () => {
   const navigate = useNavigate()
-  const wallet = useWallet()
   const [currentStep, setCurrentStep] = useState<number>(1)
   const [isGeneratingPath, setIsGeneratingPath] = useState<boolean>(false)
   const [isDeploying, setIsDeploying] = useState<boolean>(false)
-  const [deploymentStatus, setDeploymentStatus] = useState<string>("")
 
   // Form state
   const [projectName, setProjectName] = useState<string>("")
@@ -41,7 +36,6 @@ const CreateProject: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([])
   const [criticalPathResult, setCriticalPathResult] = useState<CriticalPathResult | null>(null)
   const [analysisErrors, setAnalysisErrors] = useState<string[]>([])
-  const [deploymentResult, setDeploymentResult] = useState<DeploymentResult | null>(null)
 
   // Team member form
   const [newMemberAddress, setNewMemberAddress] = useState<string>("")
@@ -53,13 +47,10 @@ const CreateProject: React.FC = () => {
   const [newTaskDuration, setNewTaskDuration] = useState<number>(1)
   const [newTaskDependencies, setNewTaskDependencies] = useState<string[]>([])
 
-  // Initialize Sui client
-  const suiClient = new SuiClient({ url: getFullnodeUrl('testnet') })
-
   const addTeamMember = () => {
     if (newMemberAddress && newMemberRole) {
       const newMember: TeamMember = {
-        id: `member_${Date.now()}`,
+        id: Date.now().toString(),
         walletAddress: newMemberAddress,
         role: newMemberRole,
       }
@@ -76,7 +67,7 @@ const CreateProject: React.FC = () => {
   const addTask = () => {
     if (newTaskName && newTaskAssignee) {
       const newTask: Task = {
-        id: `task_${Date.now()}`,
+        id: Date.now().toString(),
         name: newTaskName,
         assignedTo: newTaskAssignee,
         dependencies: newTaskDependencies,
@@ -135,79 +126,30 @@ const CreateProject: React.FC = () => {
     }, 1500) // Simulate processing time
   }
 
-  const deployToChain = async () => {
+  const deployToChain = () => {
     if (!criticalPathResult) {
-      setAnalysisErrors(["Please generate the critical path analysis before deploying."])
-      return
-    }
-
-    if (!wallet.connected) {
-      setAnalysisErrors(["Please connect your wallet before deploying."])
-      return
-    }
-
-    if (!projectName.trim()) {
-      setAnalysisErrors(["Project name is required for deployment."])
+      alert("Please generate the critical path analysis before deploying.")
       return
     }
 
     setIsDeploying(true)
-    setDeploymentStatus("Initializing deployment...")
-    setAnalysisErrors([])
-
-    try {
-      // Create project manager service
-      const projectService = createProjectManagerService(suiClient, wallet)
-      
-      setDeploymentStatus("Creating project on blockchain...")
-      
-      // Deploy the project with all data
-      const result = await projectService.deployProject(
-        projectName,
-        description,
-        startDate,
-        teamMembers,
-        tasks,
-        criticalPathResult
-      )
-
-      setDeploymentResult(result)
-
-      if (result.success) {
-        setDeploymentStatus("Project successfully deployed!")
-        
-        // Navigate to dashboard after a short delay
-        setTimeout(() => {
-          navigate("/dashboard/projects", { 
-            state: { 
-              newProject: {
-                name: projectName,
-                description,
-                startDate,
-                teamMembers,
-                tasks,
-                criticalPathResult,
-                blockchainData: {
-                  projectHolderId: result.projectHolderId,
-                  transactionHash: result.transactionHash
-                }
-              }
-            }
-          })
-        }, 2000)
-      } else {
-        setAnalysisErrors([result.error || "Deployment failed with unknown error"])
-        setDeploymentStatus("Deployment failed")
-      }
-    } catch (error) {
-      console.error("Deployment error:", error)
-      setAnalysisErrors([
-        error instanceof Error ? error.message : "Unknown deployment error occurred"
-      ])
-      setDeploymentStatus("Deployment failed")
-    } finally {
+    // Simulate blockchain deployment
+    setTimeout(() => {
       setIsDeploying(false)
-    }
+      // You can pass the critical path result to the dashboard or store it
+      navigate("/dashboard/projects", { 
+        state: { 
+          newProject: {
+            name: projectName,
+            description,
+            startDate,
+            teamMembers,
+            tasks,
+            criticalPathResult
+          }
+        }
+      })
+    }, 3000)
   }
 
   const nextStep = () => {
@@ -223,7 +165,7 @@ const CreateProject: React.FC = () => {
   }
 
   const canGeneratePath = tasks.length > 0 && !isGeneratingPath
-  const canDeploy = criticalPathResult !== null && !isDeploying && wallet.connected
+  const canDeploy = criticalPathResult !== null && !isDeploying
 
   const steps = [
     { number: 1, title: "Project Info", description: "Basic project details" },
@@ -237,19 +179,6 @@ const CreateProject: React.FC = () => {
       <div className="create-project-header">
         <h1>Create New Project</h1>
         <p>Set up your project with tasks, team members, and critical path analysis</p>
-        
-        {/* Wallet Connection Status */}
-        <div className="wallet-status">
-          {wallet.connected ? (
-            <div className="wallet-connected">
-              ✅ Wallet Connected: {wallet.account?.address?.slice(0, 8)}...
-            </div>
-          ) : (
-            <div className="wallet-disconnected">
-              ⚠️ Wallet not connected. Please connect to deploy to blockchain.
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Progress Steps */}
@@ -477,130 +406,59 @@ const CreateProject: React.FC = () => {
             {/* Error Display */}
             {analysisErrors.length > 0 && (
               <div className="error-display">
-                <h4>⚠️ Errors</h4>
+                <h4>Analysis Errors</h4>
                 <ul>
                   {analysisErrors.map((error, index) => (
-                    <li key={index} className="error-item">
-                      {error}
-                    </li>
+                    <li key={index}>{error}</li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {/* Critical Path Analysis */}
-            <div className="analysis-section">
-              <div className="analysis-header">
-                <h3>Critical Path Analysis</h3>
-                <button
-                  onClick={generateCriticalPath}
-                  disabled={!canGeneratePath}
-                  className={`generate-btn ${!canGeneratePath ? 'disabled' : ''}`}
-                >
-                  {isGeneratingPath ? (
-                    <>
-                      <span className="spinner"></span>
-                      Analyzing...
-                    </>
-                  ) : (
-                    'Generate Critical Path'
-                  )}
-                </button>
-              </div>
+            {/* Critical Path Analysis Component */}
+            <CriticalPathDisplay
+              result={criticalPathResult}
+              startDate={startDate}
+              isGenerating={isGeneratingPath}
+              onGenerate={generateCriticalPath}
+              canGenerate={canGeneratePath}
+            />
 
-              {criticalPathResult && (
-                <div className="critical-path-result">
-                  <CriticalPathDisplay result={criticalPathResult} />
-                </div>
-              )}
-
-              {!criticalPathResult && !isGeneratingPath && (
-                <div className="analysis-placeholder">
-                  <p>Click "Generate Critical Path" to analyze your project timeline and identify the critical path.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Deployment Section */}
-            <div className="deployment-section">
-              <div className="deployment-header">
-                <h3>Deploy to Blockchain</h3>
-                <button
-                  onClick={deployToChain}
-                  disabled={!canDeploy}
-                  className={`deploy-btn ${!canDeploy ? 'disabled' : ''}`}
-                >
-                  {isDeploying ? (
-                    <>
-                      <span className="spinner"></span>
-                      Deploying...
-                    </>
-                  ) : (
-                    'Deploy Project'
-                  )}
-                </button>
-              </div>
-
-              {deploymentStatus && (
-                <div className="deployment-status">
-                  <p>{deploymentStatus}</p>
-                </div>
-              )}
-
-              {deploymentResult && deploymentResult.success && (
-                <div className="deployment-success">
-                  <h4>✅ Deployment Successful!</h4>
-                  <div className="deployment-details">
-                    <p><strong>Project Holder ID:</strong> {deploymentResult.projectHolderId}</p>
-                    <p><strong>Transaction Hash:</strong> {deploymentResult.transactionHash}</p>
-                    <p><strong>Gas Used:</strong> {deploymentResult.gasUsed}</p>
-                    <p><strong>Network:</strong> Sui Testnet</p>
-                  </div>
-                  <p className="redirect-notice">Redirecting to dashboard in a few seconds...</p>
-                </div>
-              )}
-
-              {!canDeploy && (
-                <div className="deployment-requirements">
-                  <h4>Requirements for Deployment:</h4>
-                  <ul>
-                    <li className={wallet.connected ? 'completed' : 'pending'}>
-                      {wallet.connected ? '✅' : '⏳'} Wallet connected
-                    </li>
-                    <li className={criticalPathResult ? 'completed' : 'pending'}>
-                      {criticalPathResult ? '✅' : '⏳'} Critical path analysis completed
-                    </li>
-                    <li className={projectName.trim() ? 'completed' : 'pending'}>
-                      {projectName.trim() ? '✅' : '⏳'} Project name provided
-                    </li>
-                  </ul>
-                </div>
-              )}
+            <div className="deploy-section">
+              <button
+                onClick={deployToChain}
+                disabled={!canDeploy}
+                className="deploy-btn"
+              >
+                {isDeploying ? "Deploying to Blockchain..." : "Deploy to Chain"}
+              </button>
+              <p className="deploy-note">
+                This will create your project on the Sui blockchain with the critical path analysis and make it immutable.
+              </p>
             </div>
           </div>
         )}
 
         {/* Navigation Buttons */}
         <div className="form-navigation">
-          <button
-            onClick={prevStep}
-            disabled={currentStep <= 1}
-            className={`nav-btn prev-btn ${currentStep <= 1 ? 'disabled' : ''}`}
-          >
-            ← Previous
-          </button>
-
-          <div className="step-indicator">
-            Step {currentStep} of {steps.length}
-          </div>
-
-          <button
-            onClick={nextStep}
-            disabled={currentStep >= 4}
-            className={`nav-btn next-btn ${currentStep >= 4 ? 'disabled' : ''}`}
-          >
-            Next →
-          </button>
+          {currentStep > 1 && (
+            <button onClick={prevStep} className="nav-btn secondary">
+              Previous
+            </button>
+          )}
+          {currentStep < 4 && (
+            <button
+              onClick={nextStep}
+              disabled={
+                (currentStep === 1 && (!projectName || !startDate)) ||
+                (currentStep === 2 && teamMembers.length === 0) ||
+                (currentStep === 3 && tasks.length === 0)
+              }
+              className="nav-btn primary"
+            >
+              Next
+            </button>
+          )}
         </div>
       </div>
     </div>

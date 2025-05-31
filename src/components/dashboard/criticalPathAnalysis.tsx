@@ -50,16 +50,12 @@ export class CriticalPathAnalyzer {
     const criticalTasks = Array.from(this.taskMap.values()).filter(task => task.isCritical)
     const projectDuration = Math.max(...Array.from(this.taskMap.values()).map(task => task.earliestFinish))
 
-    const result = {
+    return {
       tasks: Array.from(this.taskMap.values()),
       criticalPath,
       projectDuration,
       criticalTasks
-    };
-
-    console.log(result)
-
-    return result;
+    }
   }
 
   private initializeTasks(): void {
